@@ -82,7 +82,7 @@ final class SettingsCatalog {
         new Group("界面与通用", "语言、首页与应用行为",
             new Section("界面", "list_languages", "change_screen_label_key",
                 "checkbox_enable_screen_bg", "import_image_file_key", "checkbox_enable_screen_obscure"),
-            new Section("应用行为", "checkbox_enable_pip", "checkbox_enable_exdisplay",
+            new Section("应用行为", "checkbox_enable_pip", "checkbox_enable_exdisplay", "checkbox_enable_second_screen_keyboard",
                 "checkbox_enable_game_manager_quest", "checkbox_disable_warnings"))
     };
 

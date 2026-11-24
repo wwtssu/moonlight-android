@@ -564,4 +564,20 @@
     <string name="virtual_display_off">Off</string>
     <string name="virtual_display_extend">Extended mode</string>
     <string name="virtual_display_only">Virtual display only</string>
+    <string name="external_input_title">第二屏键盘</string>
+    <string name="external_input_global_summary">在外置屏使用电脑键盘与触控板；需先关闭外接显示器模式，下次串流生效</string>
+    <string name="external_input_live_summary">仅在外置屏显示，开关立即生效</string>
+    <string name="external_input_disabled">未开启，沿用原有串流路径</string>
+    <string name="external_input_ready">已就绪，键盘与触控板在外置屏</string>
+    <string name="external_input_wait_connection">等待串流连接</string>
+    <string name="external_input_wait_display">等待可用外置屏，原串流继续</string>
+    <string name="external_input_display_off">外置屏已关闭，原串流继续</string>
+    <string name="external_input_paused">键盘已暂停，返回串流后恢复</string>
+    <string name="external_input_panel_paused">输入已暂停</string>
+    <string name="external_input_panel_paused_hint">返回串流画面后自动恢复</string>
+    <string name="external_input_same_display">串流位于外置屏，请从主屏重新进入串流后使用键盘</string>
+    <string name="external_input_window_unavailable">无法创建外置屏键盘，可重新检测屏幕</string>
+    <string name="external_input_video_busy">请先关闭外接显示器模式并重新进入串流</string>
+    <string name="external_input_close_first">请先关闭第二屏键盘，才能使用外接显示器模式</string>
+    <string name="external_input_retry">重新检测屏幕</string>
 </resources>

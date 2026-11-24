@@ -579,6 +579,12 @@
             android:defaultValue="false"/>
 
         <CheckBoxPreference
+            android:key="checkbox_enable_second_screen_keyboard"
+            android:title="@string/external_input_title"
+            android:summary="@string/external_input_global_summary"
+            android:defaultValue="false"/>
+
+        <CheckBoxPreference
             android:key="checkbox_enable_device_rumble"
             android:title="强制使用设备本身的震动马达"
             android:summary="你如果对连接的手柄本身震动效果不满意，可以开启此选项！【对强制使用月光自带USB驱动无效】"

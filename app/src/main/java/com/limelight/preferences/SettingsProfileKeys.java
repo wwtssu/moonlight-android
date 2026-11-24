@@ -51,6 +51,7 @@ final class SettingsProfileKeys {
         "checkbox_enable_sbs",
         "checkbox_enable_screen_bg",
         "checkbox_enable_screen_obscure",
+        "checkbox_enable_second_screen_keyboard",
         "checkbox_enable_sops",
         "checkbox_enable_stream_session_logging",
         "checkbox_enable_touch_sensitivity",

@@ -217,6 +217,42 @@
 
             </LinearLayout>
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:padding="10dp"
+                android:orientation="vertical"
+                android:background="@drawable/ic_game_menu_btn_selector">
+                <CheckBox
+                    android:id="@+id/check_game_display_external_keyboard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/external_input_title"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/external_input_live_summary"
+                    android:textColor="#A5A0B3"
+                    android:textSize="12sp" />
+                <TextView
+                    android:id="@+id/text_game_display_external_keyboard_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="#D0BDFF"
+                    android:textSize="12sp" />
+                <Button
+                    android:id="@+id/button_game_display_external_keyboard_retry"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/external_input_retry"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
             <Button
                 android:layout_width="match_parent"
                 android:layout_height="48dp"

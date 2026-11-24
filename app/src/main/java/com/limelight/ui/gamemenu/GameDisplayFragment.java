@@ -4,11 +4,13 @@ import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.ImageButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.limelight.Game;
 import com.limelight.R;
 import com.limelight.preferences.PreferenceConfiguration;
 import com.limelight.ui.BaseFragmentDialog.BaseGameMenuDialog;
@@ -136,6 +138,40 @@ public class GameDisplayFragment extends BaseGameMenuDialog implements View.OnCl
 
     private boolean ds5NativePcmPending = true;
 
+    private Game game;
+    private CheckBox externalKeyboard;
+    private TextView externalKeyboardStatus;
+    private View externalKeyboardRetry, externalVideoMode;
+    private boolean updatingExternalKeyboard;
+    private final Runnable externalKeyboardStatusChanged = this::refreshExternalKeyboard;
+
+    public void setGame(Game game) { this.game = game; }
+
+    @Override public void onStart() {
+        super.onStart();
+        if (game != null) game.addSecondScreenStatusListener(externalKeyboardStatusChanged);
+        refreshExternalKeyboard();
+    }
+
+    @Override public void onStop() {
+        if (game != null) game.removeSecondScreenStatusListener(externalKeyboardStatusChanged);
+        super.onStop();
+    }
+
+    private void refreshExternalKeyboard() {
+        if (externalKeyboard == null || prefConfig == null) return;
+        boolean enabled = prefConfig.enableSecondScreenKeyboard;
+        boolean videoBusy = exDiaplay || prefConfig.enableExDisplay;
+        updatingExternalKeyboard = true;
+        externalKeyboard.setChecked(enabled);
+        externalKeyboard.setEnabled(game != null && (!videoBusy || enabled));
+        updatingExternalKeyboard = false;
+        externalVideoMode.setEnabled(!enabled || exDiaplay);
+        externalKeyboardStatus.setText(videoBusy ? R.string.external_input_video_busy
+                : game != null ? game.getSecondScreenKeyboardStatus() : R.string.external_input_disabled);
+        externalKeyboardRetry.setEnabled(enabled && !videoBusy && game != null);
+    }
+
     @Override
     public void bindView(View v) {
         super.bindView(v);
@@ -217,6 +253,18 @@ public class GameDisplayFragment extends BaseGameMenuDialog implements View.OnCl
                 .getString("list_fsr_sharpness", "standard");
         fsrHdrOutputPending = PreferenceManager.getDefaultSharedPreferences(getActivity())
                 .getString("list_fsr_hdr_output", "native");
+        externalKeyboard = v.findViewById(R.id.check_game_display_external_keyboard);
+        externalKeyboardStatus = v.findViewById(R.id.text_game_display_external_keyboard_status);
+        externalKeyboardRetry = v.findViewById(R.id.button_game_display_external_keyboard_retry);
+        externalVideoMode = v.findViewById(R.id.bt_display_ex);
+        externalKeyboard.setOnCheckedChangeListener((button, enabled) -> {
+            if (updatingExternalKeyboard) return;
+            if (game == null || (enabled && exDiaplay) || !game.setSecondScreenKeyboardEnabled(enabled)) {
+                Toast.makeText(getActivity(), R.string.external_input_video_busy, Toast.LENGTH_SHORT).show();
+            }
+            refreshExternalKeyboard();
+        });
+        externalKeyboardRetry.setOnClickListener(button -> { if (game != null) game.retrySecondScreenKeyboard(); });
         initViewData();
         initAudio();
         initHDR();
@@ -552,6 +600,7 @@ public class GameDisplayFragment extends BaseGameMenuDialog implements View.OnCl
         tx_game_display_fps.setText("\t帧率："+fps+"fps");
         tx_game_display_direction.setText("\t方向："+(!direction?"横屏":"竖屏(旋转功能失效，自行在PC端显示器改成竖向)"));
         tx_game_display_ex.setText("\t模式："+(exDiaplay?"外接显示器":"正常模式"));
+        refreshExternalKeyboard();
     }
 
     private void initAudio(){
@@ -810,6 +859,11 @@ public class GameDisplayFragment extends BaseGameMenuDialog implements View.OnCl
         }
 
         if(v.getId()==R.id.btn_right){
+            if (exDiaplay && PreferenceManager.getDefaultSharedPreferences(getActivity())
+                    .getBoolean(PreferenceConfiguration.SECOND_SCREEN_KEYBOARD_PREF, false)) {
+                Toast.makeText(getActivity(), R.string.external_input_close_first, Toast.LENGTH_SHORT).show();
+                return;
+            }
             if(width==0||height==0||bitrate==0||fps==0){
                 Toast.makeText(getActivity(),"请检查配置信息！",Toast.LENGTH_SHORT).show();
                 return;
@@ -925,6 +979,10 @@ public class GameDisplayFragment extends BaseGameMenuDialog implements View.OnCl
         }
 
         if(v.getId()==R.id.bt_display_ex){
+            if (!exDiaplay && prefConfig != null && prefConfig.enableSecondScreenKeyboard) {
+                Toast.makeText(getActivity(), R.string.external_input_close_first, Toast.LENGTH_SHORT).show();
+                return;
+            }
             exDiaplay=!exDiaplay;
             initViewData();
             return;

@@ -269,6 +269,8 @@ public class PreferenceConfiguration {
     //自由摇杆啊
     public boolean enableNewAnalogStick;
 
+    public static final String SECOND_SCREEN_KEYBOARD_PREF = "checkbox_enable_second_screen_keyboard";
+    public boolean enableSecondScreenKeyboard;
     public boolean enableExDisplay;
 
     //触控屏幕灵敏度
@@ -1009,6 +1011,7 @@ public class PreferenceConfiguration {
         config.enableNewAnalogStick=prefs.getBoolean(CHECKBOX_CHECKBOX_ENABLE_ANALOG_STICK_NEW,false);
 
         config.enableExDisplay=prefs.getBoolean("checkbox_enable_exdisplay",false);
+        config.enableSecondScreenKeyboard=prefs.getBoolean(SECOND_SCREEN_KEYBOARD_PREF,false);
 
         config.touchSensitivityX =prefs.getInt(TOUCH_SENSITIVITY,100);
 

@@ -34,6 +34,9 @@ import com.limelight.fsr.VideoProcessingGLSurfaceView;
 // EXTENSION DEVELOPMENT [EXT-IME-ACCESSORY-BAR] [MODIFIED] BEGIN
 import com.limelight.extensions.keyboard.ImeKeyboardExtensionController;
 // EXTENSION DEVELOPMENT [EXT-IME-ACCESSORY-BAR] [MODIFIED] END
+import com.limelight.extensions.secondscreen.ExternalInputController;
+import com.limelight.extensions.secondscreen.KeyOwnership;
+import com.limelight.extensions.secondscreen.PanelTouchpadState;
 import com.limelight.stereo3d.Stereo3dOutputLayout;
 import com.limelight.nvstream.MicUplinkConnection;
 import com.limelight.nvstream.NvConnection;
@@ -419,6 +422,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private boolean backgroundReconnectCleanupComplete;
     private volatile boolean restartingForBackgroundReconnect;
     private int pendingBackgroundReconnectErrorCode;
+    private ExternalInputController externalInputController;
+    private final KeyOwnership externalKeyOwnership = new KeyOwnership();
     private DisplayManager externalDisplayManager;
     private boolean externalDisplayListenerRegistered;
     private boolean externalDisplayRoutingDestroyed;
@@ -1114,6 +1119,27 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         if(prefConfig.enableExDisplay){
             showSecondScreen();
         }
+
+        externalInputController = new ExternalInputController(this,
+                this::findPreferredExternalDisplay, this::sendExternalPanelKey,
+                new PanelTouchpadState.Sink() {
+                    @Override public void move(int dx, int dy) {
+                        if (connected) conn.sendMouseMove(clampPanelDelta(dx), clampPanelDelta(dy));
+                    }
+                    @Override public void button(boolean right, boolean down) {
+                        if (!connected) return;
+                        byte button = right ? MouseButtonPacket.BUTTON_RIGHT : MouseButtonPacket.BUTTON_LEFT;
+                        if (down) conn.sendMouseButtonDown(button);
+                        else conn.sendMouseButtonUp(button);
+                    }
+                    @Override public void scroll(int vertical, int horizontal) {
+                        if (!connected) return;
+                        if (vertical != 0) conn.sendMouseHighResScroll(clampPanelDelta(vertical));
+                        if (horizontal != 0) conn.sendMouseHighResHScroll(clampPanelDelta(horizontal));
+                    }
+                });
+        externalInputController.configure(prefConfig.enableSecondScreenKeyboard, prefConfig.enableExDisplay);
+        externalInputController.setFocused(hasWindowFocus());
 
         //强制体感
         setMotionForceGyro();
@@ -1844,6 +1870,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
+        if (externalInputController != null) externalInputController.setFocused(hasFocus);
+        if (!hasFocus) externalKeyOwnership.clear();
         if (!hasFocus) cancelStylusInput();
 
         // EXTENSION DEVELOPMENT [EXT-IME-ACCESSORY-BAR] [MODIFIED] BEGIN
@@ -2174,6 +2202,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         backgroundReconnectHandler.removeCallbacksAndMessages(null);
         sessionTelemetryHandler.removeCallbacksAndMessages(null);
         emitSessionTelemetry();
+        if (externalInputController != null) {
+            externalInputController.destroy();
+            externalInputController = null;
+        }
+        externalKeyOwnership.clear();
         releaseExternalDisplayRouting();
         cancelDsTouchpadDrag();
         releaseDsTouchpadInput();
@@ -2270,6 +2303,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     protected void onResume() {
         super.onResume();
         activityResumed = true;
+        if (externalInputController != null) externalInputController.setResumed(true);
         revealDsTouchpadAndScheduleAutoHide();
 
         if (virtualMouseOverlay != null) {
@@ -2292,6 +2326,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     protected void onPause() {
         cancelStylusInput();
         activityResumed = false;
+        if (externalInputController != null) externalInputController.setResumed(false);
         cancelDsTouchpadDrag();
         releaseDsTouchpadInput();
 
@@ -2591,7 +2626,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     }
 
     private byte getModifierState() {
-        return (byte) modifierFlags;
+        return (byte) (modifierFlags | (externalInputController != null ? externalInputController.modifiers() : 0));
     }
 
     // EXTENSION DEVELOPMENT [EXT-IME-ASCII-INPUT] [MODIFIED] BEGIN
@@ -2627,8 +2662,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         for (int i = 0; i < keyStrokes.length; i++) {
             byte modifiers = (byte) ((getModifierState() & ~KeyboardPacket.MODIFIER_SHIFT)
                     | keyStrokes[i].getRequiredModifiers());
-            conn.sendKeyboardInput(keyMaps[i], KeyboardPacket.KEY_DOWN, modifiers, (byte) 0);
-            conn.sendKeyboardInput(keyMaps[i], KeyboardPacket.KEY_UP, modifiers, (byte) 0);
+            sendExistingKeyboardInput(Integer.MIN_VALUE + 1, keyMaps[i], true, modifiers, (byte) 0);
+            sendExistingKeyboardInput(Integer.MIN_VALUE + 1, keyMaps[i], false, modifiers, (byte) 0);
         }
         return true;
     }
@@ -2754,7 +2789,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 return true;
             }
 
-            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, getModifierState(event),
+            sendExistingKeyboardInput(event.getDeviceId(), translated, true, getModifierState(event),
                     keyboardTranslator.hasNormalizedMapping(event.getKeyCode(), event.getDeviceId()) ? 0 : MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
         }
 
@@ -2833,7 +2868,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 return (unicodeChar & KeyCharacterMap.COMBINING_ACCENT) == 0 && (unicodeChar & KeyCharacterMap.COMBINING_ACCENT_MASK) != 0;
             }
 
-            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, getModifierState(event),
+            sendExistingKeyboardInput(event.getDeviceId(), translated, false, getModifierState(event),
                     keyboardTranslator.hasNormalizedMapping(event.getKeyCode(), event.getDeviceId()) ? 0 : MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
         }
 
@@ -4053,6 +4088,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         restartMicAfterBackground = false;
         releaseBackgroundStreamWakeLock();
 
+        if (externalInputController != null) externalInputController.setConnected(false);
+        externalKeyOwnership.clear();
+
         if (connecting || connected) {
             logSessionInfo("CONNECT", "请求停止串流连接");
             connecting = connected = false;
@@ -4296,6 +4334,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             @Override
             public void run() {
                 connected = true;
+                if (externalInputController != null) externalInputController.setConnected(true);
                 connecting = false;
                 if (usbDriverBinder != null) {
                     usbDriverBinder.configureUsbIp(prefConfig.usbIpMode ? getIntent().getStringExtra(EXTRA_HOST) : null, conn != null ? conn.getUsbIpImportHost() : null, conn != null ? conn.getUsbIpTlsToken() : null);
@@ -4761,12 +4800,59 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
 
             if (buttonDown) {
-                conn.sendKeyboardInput(keyMap, KeyboardPacket.KEY_DOWN, getModifierState(), (byte)0);
+                sendExistingKeyboardInput(Integer.MIN_VALUE, keyMap, true, getModifierState(), (byte)0);
             }
             else {
-                conn.sendKeyboardInput(keyMap, KeyboardPacket.KEY_UP, getModifierState(), (byte)0);
+                sendExistingKeyboardInput(Integer.MIN_VALUE, keyMap, false, getModifierState(), (byte)0);
             }
         }
+    }
+
+    private void sendExistingKeyboardInput(int source, short key, boolean down, byte modifiers, byte flags) {
+        if (externalKeyOwnership.existing(source, key, down)) {
+            conn.sendKeyboardInput(key, down ? KeyboardPacket.KEY_DOWN : KeyboardPacket.KEY_UP, modifiers, flags);
+        }
+    }
+
+    private void sendExternalPanelKey(int code, boolean down, byte modifiers) {
+        if (!connected || conn == null) return;
+        short key = keyboardTranslator.translate(code, -1);
+        if (key != 0 && externalKeyOwnership.panel(key, down)) {
+            // Panel chords belong to the PC, including combinations reserved by local onKey().
+            conn.sendKeyboardInput(key, down ? KeyboardPacket.KEY_DOWN : KeyboardPacket.KEY_UP,
+                    (byte) (modifiers | modifierFlags), (byte) 0);
+        }
+    }
+
+    private static short clampPanelDelta(int value) {
+        return (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, value));
+    }
+
+    public boolean setSecondScreenKeyboardEnabled(boolean enabled) {
+        android.content.SharedPreferences preferences = android.preference.PreferenceManager.getDefaultSharedPreferences(this);
+        if (enabled && (prefConfig.enableExDisplay || presentation != null
+                || preferences.getBoolean("checkbox_enable_exdisplay", false))) return false;
+        prefConfig.enableSecondScreenKeyboard = enabled;
+        preferences.edit().putBoolean(PreferenceConfiguration.SECOND_SCREEN_KEYBOARD_PREF, enabled).apply();
+        if (externalInputController != null) externalInputController.configure(enabled,
+                prefConfig.enableExDisplay || presentation != null);
+        return true;
+    }
+
+    public int getSecondScreenKeyboardStatus() {
+        return externalInputController != null ? externalInputController.status() : R.string.external_input_disabled;
+    }
+
+    public void retrySecondScreenKeyboard() {
+        if (externalInputController != null) externalInputController.retry();
+    }
+
+    public void addSecondScreenStatusListener(Runnable listener) {
+        if (externalInputController != null) externalInputController.addListener(listener);
+    }
+
+    public void removeSecondScreenStatusListener(Runnable listener) {
+        if (externalInputController != null) externalInputController.removeListener(listener);
     }
 
     @Override

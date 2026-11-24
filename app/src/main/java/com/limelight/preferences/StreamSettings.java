@@ -461,6 +461,34 @@ public class StreamSettings extends Activity {
             pref.setEntryValues(entryValues);
         }
 
+        private void configureSecondScreenKeyboardPreferences() {
+            CheckBoxPreference keyboard = (CheckBoxPreference) findPreference(PreferenceConfiguration.SECOND_SCREEN_KEYBOARD_PREF);
+            CheckBoxPreference video = (CheckBoxPreference) findPreference("checkbox_enable_exdisplay");
+            if (keyboard == null || video == null) return;
+            keyboard.setEnabled(!video.isChecked() || keyboard.isChecked());
+            video.setEnabled(!keyboard.isChecked() || video.isChecked());
+            keyboard.setSummary(video.isChecked() ? R.string.external_input_video_busy : R.string.external_input_global_summary);
+            keyboard.setOnPreferenceChangeListener((preference, value) -> {
+                boolean enabled = Boolean.TRUE.equals(value);
+                if (enabled && video.isChecked()) {
+                    Toast.makeText(getActivity(), R.string.external_input_video_busy, Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+                video.setEnabled(!enabled || video.isChecked());
+                return true;
+            });
+            video.setOnPreferenceChangeListener((preference, value) -> {
+                boolean enabled = Boolean.TRUE.equals(value);
+                if (enabled && keyboard.isChecked()) {
+                    Toast.makeText(getActivity(), R.string.external_input_close_first, Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+                keyboard.setEnabled(!enabled || keyboard.isChecked());
+                keyboard.setSummary(enabled ? R.string.external_input_video_busy : R.string.external_input_global_summary);
+                return true;
+            });
+        }
+
         private void resetBitrateToDefault(SharedPreferences prefs, String res, String fps) {
             if (res == null) {
                 res = prefs.getString(PreferenceConfiguration.RESOLUTION_PREF_STRING, PreferenceConfiguration.DEFAULT_RESOLUTION);
@@ -486,6 +514,7 @@ public class StreamSettings extends Activity {
         public void onResume() {
             super.onResume();
             updateStreamLogSummary();
+            configureSecondScreenKeyboardPreferences();
             // Keep the Preference lifecycle for dependencies and activity results. Only the
             // independent settings sheet is visible; never open native preference dialogs.
             new Handler().post(() -> {
@@ -513,6 +542,7 @@ public class StreamSettings extends Activity {
             super.onCreate(savedInstanceState);
 
             addPreferencesFromResource(R.xml.preferences);
+            configureSecondScreenKeyboardPreferences();
             PreferenceScreen screen = getPreferenceScreen();
 
             ListPreference videoRenderModePref = (ListPreference) findPreference(
